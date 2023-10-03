@@ -140,7 +140,7 @@ class CSP:
 
         # Run AC-3 on all constraints in the CSP, to weed out all of the
         # values that are not arc-consistent to begin with
-        self.inference(assignment, self.get_all_arcs())
+        """ self.inference(assignment, self.get_all_arcs()) """
 
         # Call backtrack with the partial assignment 'assignment'
         return self.backtrack(assignment)
@@ -173,6 +173,7 @@ class CSP:
         if self.is_complete(assignment):
             return assignment
         var = self.select_unassigned_variable(assignment)
+        print("var", var)
         for value in assignment[var]:
             new_assignment = copy.deepcopy(assignment)
             new_assignment[var] = [value]
@@ -182,9 +183,8 @@ class CSP:
                 if result is not None:
                     return result
             new_assignment[var] = value
-            if self.is_complete(new_assignment):
-                return new_assignment
-        return None
+            assignment = new_assignment
+            return None
 
     def select_unassigned_variable(self, assignment):
         """The function 'Select-Unassigned-Variable' from the pseudocode
@@ -215,14 +215,11 @@ class CSP:
         if len(queue) == 0:
             return True
         i, j = queue.pop(0)
-        print("i", i, "j", j)
         if self.revise(assignment, i, j):
             if len(assignment[i]) == 0:
                 return False
             for k in self.get_all_neighboring_arcs(i):
-                print("k", k)
                 if k[0] != j:
-                    print("k", k)
                     queue.append(k)
         return self.inference(assignment, queue)
 
@@ -238,20 +235,31 @@ class CSP:
         # TODO: YOUR CODE HERE
         revised = False
         delete_values = []
+        correct_values = []
+        """ liste = [x for x in assignment[i] if x in assignment[j]] """
         for x in assignment[i]:
             for y in assignment[j]:
-                if not (x, y) in self.constraints[i][j]:
-                    print("x", x, "y", y)
-                    delete_values.append(x)
-                    assignment[i].remove(x)
-                    revised = True
+                """ print((x, y) in self.constraints[i][j]) """
+                print((x,y), self.constraints[i][j])
+                if (x, y) in self.constraints[i][j]:
+                    print(True)
+                    """ assignment[i].remove(x) """
+                    correct_values.append(x)
+                    """ break """
+                """ if self.constraints[i][j] == (x,y):
+                    if x == y:
+                        correct_values.append(x) """
+            """ if any([self.constraints[i][j] for y in assignment[j]]):
+                correct_values.append(x) """
+
             """ if not any([self.constraints[i][j] for y in assignment[j]]):
                 assignment[i].remove(x)
                 revised = True """
             """ if not any([self.constraints[i][j] for y in assignment[j]]):
                 assignment[i].remove(x)
                 revised = True """
-        print(revised)
+        """ print(revised) """
+        assignment[i] = correct_values
         return revised
 
     def is_complete(self, assignment):
@@ -326,6 +334,7 @@ def print_sudoku_solution(solution):
     for row in range(9):
         print(row)
         for col in range(9):
+            print("solution", solution)
             print(solution["%d-%d" % (row, col)][0], end=" "),
             if col == 2 or col == 5:
                 print("|", end=" "),
@@ -335,12 +344,8 @@ def print_sudoku_solution(solution):
 
 
 csp = create_map_coloring_csp()
-print(csp.constraints)
 temp = csp.backtracking_search()
-print(temp)
-""" print(csp.domains)
-print(csp.constraints)
-print(csp.get_all_neighboring_arcs("WA")) """
+print("australia", temp)
 
-soduko = create_sudoku_csp("easy.txt")
-""" print_sudoku_solution(soduko.backtracking_search()) """
+""" soduko = create_sudoku_csp("easy.txt")
+print_sudoku_solution(soduko.backtracking_search()) """
