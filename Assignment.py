@@ -4,6 +4,8 @@
 
 import copy
 from itertools import product as prod
+import random
+import math
 
 
 class CSP:
@@ -17,6 +19,10 @@ class CSP:
         # self.constraints[i][j] is a list of legal value pairs for
         # the variable pair (i, j)
         self.constraints = {}
+
+        # Counters for the number of times backtrack and failure are called
+        self.backtrack_count = 0
+        self.failure_count = 0
 
     def add_variable(self, name: str, domain: list):
         """Add a new variable to the CSP.
@@ -140,7 +146,7 @@ class CSP:
 
         # Run AC-3 on all constraints in the CSP, to weed out all of the
         # values that are not arc-consistent to begin with
-        """ self.inference(assignment, self.get_all_arcs()) """
+        self.inference(assignment, self.get_all_arcs())
 
         # Call backtrack with the partial assignment 'assignment'
         return self.backtrack(assignment)
@@ -170,21 +176,33 @@ class CSP:
         iterations of the loop.
         """
         # TODO: YOUR CODE HERE
+
+        # Update backtrack count
+        self.backtrack_count += 1
+
+        # Check if the assignment is complete
         if self.is_complete(assignment):
             return assignment
+
+        # Select an unassigned variable, if there is any
         var = self.select_unassigned_variable(assignment)
-        print("var", var)
+        if var == None:
+            self.failure_count += 1
+            return None
+        # Try all values in the domain of the variable
         for value in assignment[var]:
             new_assignment = copy.deepcopy(assignment)
             new_assignment[var] = [value]
-            noe = self.get_all_neighboring_arcs(var)
+            # Check if the assignment is consistent
             if self.inference(new_assignment, self.get_all_neighboring_arcs(var)):
+                # If it is consistent, call backtrack recursively
                 result = self.backtrack(new_assignment)
+                # If the result is not None, return it
                 if result is not None:
                     return result
-            new_assignment[var] = value
-            assignment = new_assignment
-            return None
+        # If the assignment is not consistent, return None
+        self.failure_count += 1
+        return None
 
     def select_unassigned_variable(self, assignment):
         """The function 'Select-Unassigned-Variable' from the pseudocode
@@ -193,17 +211,25 @@ class CSP:
         of legal values has a length greater than one.
         """
         # TODO: YOUR CODE HERE
-        """ longest_list = 0
-        longest_key = None
+
+        # The commented lines are for random selection of unassigned variable
+        # Uncomment them to use random selection
+        # The backtrack function will (usually) be called more times with random selection
+        """ key_list = [x for x in assignment if len(assignment[x]) > 1] """
+
+        # The following code uses the minimum remaining value (MRV) heuristic to choose unassigned variable
+        shortest_list = math.inf
+        shortest_key = None
         for key in assignment:
-            if len(assignment[key]) > 1:
-                if longest_list < len(assignment[key]):
-                    longest_list = len(assignment[key])
-                    longest_key = key
-        return longest_key """
-        for key in assignment:
-            if len(assignment[key]) > 1:
-                return key
+            # We will ignore all assigned values
+            if len(assignment[key]) == 1:
+                continue
+            # If the length of the domain is shorter than the current shortest list, update the shortest list
+            if len(assignment[key]) < shortest_list:
+                shortest_list = len(assignment[key])
+                shortest_key = key
+        """ return random.choice(key_list) """
+        return shortest_key
 
     def inference(self, assignment, queue):
         """The function 'AC-3' from the pseudocode in the textbook.
@@ -212,16 +238,20 @@ class CSP:
         is the initial queue of arcs that should be visited.
         """
         # TODO: YOUR CODE HERE
-        if len(queue) == 0:
-            return True
-        i, j = queue.pop(0)
-        if self.revise(assignment, i, j):
-            if len(assignment[i]) == 0:
-                return False
-            for k in self.get_all_neighboring_arcs(i):
-                if k[0] != j:
-                    queue.append(k)
-        return self.inference(assignment, queue)
+
+        # While queue is not empty, get first element and check if it can be revised
+        while len(queue) > 0:
+            i, j = queue.pop(0)
+            # If it can be revised, check if the domain of i is empty
+            if self.revise(assignment, i, j):
+                if len(assignment[i]) == 0:
+                    return False
+                # If it is not empty, add all neighbors of i to the queue
+                for k in self.get_all_neighboring_arcs(i):
+                    if k[0] != j:
+                        queue.append(k)
+        # If the queue is empty, return True
+        return True
 
     def revise(self, assignment, i, j):
         """The function 'Revise' from the pseudocode in the textbook.
@@ -233,38 +263,34 @@ class CSP:
         legal values in 'assignment'.
         """
         # TODO: YOUR CODE HERE
+
+        # Check if there is a value in i's domain that doesn't satisfy the constraint between i and j
         revised = False
-        delete_values = []
         correct_values = []
-        """ liste = [x for x in assignment[i] if x in assignment[j]] """
         for x in assignment[i]:
             for y in assignment[j]:
-                """ print((x, y) in self.constraints[i][j]) """
-                print((x,y), self.constraints[i][j])
+                # If the value of x and y is in the constraint, add it to the list of correct values
                 if (x, y) in self.constraints[i][j]:
-                    print(True)
-                    """ assignment[i].remove(x) """
-                    correct_values.append(x)
-                    """ break """
-                """ if self.constraints[i][j] == (x,y):
-                    if x == y:
-                        correct_values.append(x) """
-            """ if any([self.constraints[i][j] for y in assignment[j]]):
-                correct_values.append(x) """
+                    if x not in correct_values:
+                        correct_values.append(x)
 
-            """ if not any([self.constraints[i][j] for y in assignment[j]]):
-                assignment[i].remove(x)
-                revised = True """
-            """ if not any([self.constraints[i][j] for y in assignment[j]]):
-                assignment[i].remove(x)
-                revised = True """
-        """ print(revised) """
+        # If some values have been deleted, revised is True
+        if assignment[i] != correct_values:
+            revised = True
+        # If there are correct values, assign them to i's domain
         assignment[i] = correct_values
         return revised
 
     def is_complete(self, assignment):
+        """
+        Helper method to check whether the assignment is complete
+        """
+        # Check that there are no conflicts. If there are any, return False
+        if not self.inference(assignment, self.get_all_arcs()):
+            return False
+        # Check if all variables have been assigned a value
         for key in assignment:
-            if len(assignment[key]) > 1:
+            if len(assignment[key]) != 1:
                 return False
         return True
 
@@ -332,9 +358,7 @@ def print_sudoku_solution(solution):
     representation.
     """
     for row in range(9):
-        print(row)
         for col in range(9):
-            print("solution", solution)
             print(solution["%d-%d" % (row, col)][0], end=" "),
             if col == 2 or col == 5:
                 print("|", end=" "),
@@ -343,9 +367,19 @@ def print_sudoku_solution(solution):
             print("------+-------+------")
 
 
-csp = create_map_coloring_csp()
-temp = csp.backtracking_search()
-print("australia", temp)
+if __name__ == "__main__":
+    print("Map Coloring")
+    australia_map = create_map_coloring_csp()
+    print(australia_map.backtracking_search())
+    print(f"Backtrack called {australia_map.backtrack_count} times")
+    print(f"Failure called {australia_map.failure_count} times")
+    print("")
 
-""" soduko = create_sudoku_csp("easy.txt")
-print_sudoku_solution(soduko.backtracking_search()) """
+    file_names = ["easy.txt", "medium.txt", "hard.txt", "veryhard.txt"]
+    for file_name in file_names:
+        print(f"Sudoku {file_name}")
+        sudoku = create_sudoku_csp(file_name)
+        print_sudoku_solution(sudoku.backtracking_search())
+        print(f"Backtrack called {sudoku.backtrack_count} times")
+        print(f"Failure called {sudoku.failure_count} times")
+        print("")
